@@ -17,17 +17,19 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.RadioButton;
 import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity implements CompoundButton.OnCheckedChangeListener {
     private CheckBox cb_assist;
     private CheckBox cb_window;
 
-    private CheckBox cb_lucky_money;
-    private CheckBox cb_people_nearby;
-    private CheckBox cb_auto_prize;
-    private CheckBox cb_add_friend_group;
-    private CheckBox auto_sns;
+    private RadioButton cb_lucky_money;
+    private RadioButton cb_people_nearby;
+    private RadioButton cb_auto_prize;
+    private RadioButton cb_add_friend_group;
+    private RadioButton auto_sns;
+    private RadioButton auto_repay;
 
     public static final String TAG = MainActivity.class.getName();
 
@@ -51,33 +53,38 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
         }
 
         // 红包事件
-        cb_lucky_money = (CheckBox) findViewById(R.id.cb_lucky_money);
+        cb_lucky_money = (RadioButton) findViewById(R.id.cb_lucky_money);
         if (cb_lucky_money != null) {
             cb_lucky_money.setOnCheckedChangeListener(this);
         }
 
         // 附近的人事件
-        cb_people_nearby = (CheckBox) findViewById(R.id.cb_people_nearby);
+        cb_people_nearby = (RadioButton) findViewById(R.id.cb_people_nearby);
         if (cb_people_nearby != null) {
             cb_people_nearby.setOnCheckedChangeListener(this);
         }
 
         // 自动点赞
-        cb_auto_prize = (CheckBox) findViewById(R.id.cb_auto_prize);
+        cb_auto_prize = (RadioButton) findViewById(R.id.cb_auto_prize);
         if (cb_auto_prize != null) {
             cb_auto_prize.setOnCheckedChangeListener(this);
         }
 
         // 添加群好友
-        cb_add_friend_group = (CheckBox) findViewById(R.id.cb_add_friend_group);
+        cb_add_friend_group = (RadioButton) findViewById(R.id.cb_add_friend_group);
         if (cb_add_friend_group != null) {
             cb_add_friend_group.setOnCheckedChangeListener(this);
         }
 
         // 自动发朋友圈
-        auto_sns = (CheckBox) findViewById(R.id.cb_auto_sns);
+        auto_sns = (RadioButton) findViewById(R.id.cb_auto_sns);
         if (auto_sns != null) {
             auto_sns.setOnCheckedChangeListener(this);
+        }
+
+        auto_repay = (RadioButton) findViewById(R.id.cb_auto_repay);
+        if (auto_repay != null) {
+            auto_repay.setOnCheckedChangeListener(this);
         }
     }
 
@@ -260,6 +267,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                 if (isChecked && !isAccessibilitySettingsOn()) {
                     requestAssistPermission();
                 }
+
                 break;
 
             /**
@@ -301,6 +309,15 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     Config.isOpenAutoOpenLuckyMoney = false;
                     Log.d(TAG, "Config.isOpenAutoOpenLuckyMoney=" + Config.isOpenAutoOpenLuckyMoney);
                 }
+
+                if (isChecked) {
+//                cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+                }
                 break;
 
             /**
@@ -326,6 +343,16 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     Config.isOpenAutoNearBy = false;
                     Log.d(TAG, "Config.isOpenAutoNearBy=" + Config.isOpenAutoNearBy);
                 }
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+//                cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+                }
+
                 break;
 
             /**
@@ -352,6 +379,17 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     Log.d(TAG, "Config.isOpenAutoPrize=" + Config.isOpenAutoPrize);
 
                 }
+
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+//                cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+                }
+
                 break;
 
 
@@ -376,6 +414,17 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     Config.isOpenAddFriendFromGroup = false;
                     Log.d(TAG, "Config.isOpenAddFriendFromGroup=" + Config.isOpenAddFriendFromGroup);
                 }
+
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+//                cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+                }
+
                 break;
 
             /**
@@ -400,6 +449,52 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     Config.isIsOpenAutoSns = false;
                     Log.d(TAG, "Config.isIsOpenAutoSns=" + Config.isIsOpenAutoSns);
                 }
+
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+//                auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+                }
+
+                break;
+
+            /**
+             * 自动回复
+             */
+            case R.id.cb_auto_repay:
+
+                if (isChecked) {
+
+                    if (isAccessibilitySettingsOn()) {
+
+                        Config.isOpenAutoReply = true;
+
+                        Log.d(TAG, "Config.isOpenAutoReply=" + Config.isOpenAutoReply);
+                    } else {
+
+                        Toast.makeText(MainActivity.this, "辅助功能未开启", Toast.LENGTH_SHORT).show();
+                        buttonView.setChecked(false);
+                    }
+
+                } else {
+                    Config.isOpenAutoReply = false;
+                    Log.d(TAG, "Config.isOpenAutoReply=" + Config.isOpenAutoReply);
+                }
+
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+//                    auto_repay.setChecked(false);
+                }
+
                 break;
         }
 
