@@ -93,8 +93,8 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
         super.onResume();
 
-//        cb_assist.setChecked(isAccessibilitySettingsOn());
-//        cb_window.setChecked(canShowWindow(this));
+        cb_assist.setChecked(isAccessibilitySettingsOn());
+        cb_window.setChecked(canShowWindow(this));
 
         if (canShowWindow(this)) {
             requestFloatWindowPermissionIfNeeded();

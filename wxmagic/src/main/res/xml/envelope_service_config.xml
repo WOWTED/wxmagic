@@ -5,7 +5,6 @@
     android:accessibilityFlags="flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:description="@string/app_name"
-    android:notificationTimeout="1"
     android:packageNames="com.tencent.mm,com.huawei.android.launcher" />
 
     <!-- 默认监测所有程序 -->
