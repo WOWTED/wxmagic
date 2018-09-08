@@ -30,6 +30,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
     private RadioButton cb_add_friend_group;
     private RadioButton auto_sns;
     private RadioButton auto_repay;
+    private RadioButton auto_crawler;
 
     public static final String TAG = MainActivity.class.getName();
 
@@ -82,10 +83,18 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
             auto_sns.setOnCheckedChangeListener(this);
         }
 
+        // 自动回复
         auto_repay = (RadioButton) findViewById(R.id.cb_auto_repay);
         if (auto_repay != null) {
             auto_repay.setOnCheckedChangeListener(this);
         }
+
+        // 自动抓取群信息
+        auto_crawler = (RadioButton) findViewById(R.id.cb_auto_crawler);
+        if (auto_crawler != null) {
+            auto_crawler.setOnCheckedChangeListener(this);
+        }
+
     }
 
     @Override
@@ -169,39 +178,6 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 
         }
     }
-
-/*    private MoveTextView floatBtn1;
-    private MoveTextView floatBtn2;
-    private WindowManager wm;
-
-    //创建悬浮按钮
-    private void createFloatView() {
-        WindowManager.LayoutParams pl = new WindowManager.LayoutParams();
-        wm = (WindowManager) getSystemService(getApplication().WINDOW_SERVICE);
-        pl.type = WindowManager.LayoutParams.TYPE_TOAST;//修改为此TYPE_TOAST，可以不用申请悬浮窗权限就能创建悬浮窗,但在部分手机上会崩溃
-        pl.format = PixelFormat.RGBA_8888;
-        pl.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        pl.gravity = Gravity.END | Gravity.BOTTOM;
-        pl.x = 0;
-        pl.y = 0;
-
-        pl.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        pl.height = WindowManager.LayoutParams.WRAP_CONTENT;
-
-        LayoutInflater inflater = LayoutInflater.from(this);
-        floatBtn1 = (MoveTextView) inflater.inflate(R.layout.floatbtn, null);
-        floatBtn1.setText("打招呼");
-        floatBtn2 = (MoveTextView) inflater.inflate(R.layout.floatbtn, null);
-        floatBtn2.setText("抢红包");
-        wm.addView(floatBtn1, pl);
-        pl.gravity = Gravity.BOTTOM | Gravity.START;
-        wm.addView(floatBtn2, pl);
-
-        floatBtn1.setOnClickListener(this);
-        floatBtn2.setOnClickListener(this);
-        floatBtn1.setWm(wm, pl);
-        floatBtn2.setWm(wm, pl);
-    }*/
 
     /**
      * 检测辅助功能是否开启
@@ -317,6 +293,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     cb_add_friend_group.setChecked(false);
                     auto_sns.setChecked(false);
                     auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
                 }
                 break;
 
@@ -351,6 +328,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     cb_add_friend_group.setChecked(false);
                     auto_sns.setChecked(false);
                     auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
                 }
 
                 break;
@@ -388,6 +366,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     cb_add_friend_group.setChecked(false);
                     auto_sns.setChecked(false);
                     auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
                 }
 
                 break;
@@ -423,6 +402,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
 //                cb_add_friend_group.setChecked(false);
                     auto_sns.setChecked(false);
                     auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
                 }
 
                 break;
@@ -458,6 +438,7 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     cb_add_friend_group.setChecked(false);
 //                auto_sns.setChecked(false);
                     auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
                 }
 
                 break;
@@ -493,6 +474,43 @@ public class MainActivity extends AppCompatActivity implements CompoundButton.On
                     cb_add_friend_group.setChecked(false);
                     auto_sns.setChecked(false);
 //                    auto_repay.setChecked(false);
+                    auto_crawler.setChecked(false);
+                }
+
+                break;
+
+            /**
+             * 自动抓取群信息
+             */
+            case R.id.cb_auto_crawler:
+
+                if (isChecked) {
+
+                    if (isAccessibilitySettingsOn()) {
+
+                        Config.isOpenAutoCrawler = true;
+
+                        Log.d(TAG, "Config.isOpenAutoCrawler=" + Config.isOpenAutoCrawler);
+                    } else {
+
+                        Toast.makeText(MainActivity.this, "辅助功能未开启", Toast.LENGTH_SHORT).show();
+                        buttonView.setChecked(false);
+                    }
+
+                } else {
+                    Config.isOpenAutoCrawler = false;
+                    Log.d(TAG, "Config.isOpenAutoCrawler=" + Config.isOpenAutoCrawler);
+                }
+
+                if (isChecked) {
+
+                    cb_lucky_money.setChecked(false);
+                    cb_people_nearby.setChecked(false);
+                    cb_auto_prize.setChecked(false);
+                    cb_add_friend_group.setChecked(false);
+                    auto_sns.setChecked(false);
+                    auto_repay.setChecked(false);
+//                    auto_crawler.setChecked(false);
                 }
 
                 break;

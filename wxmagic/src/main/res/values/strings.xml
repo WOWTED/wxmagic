@@ -8,6 +8,7 @@
     <string name="add_friend_group">添加群好友</string>
     <string name="auto_sns">自动发朋友圈</string>
     <string name="auto_repay">自动回复</string>
+    <string name="auto_crawler">自动抓取群信息</string>
 
     <string name="dialog_enable_accessibility_msg">Enable my Accessibility Service in order to get current activity info on Android 5.0+</string>
     <string name="dialog_enable_accessibility_positive_btn">Enable It</string>

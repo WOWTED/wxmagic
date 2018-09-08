@@ -7,7 +7,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -68,7 +67,6 @@ public class AutoService extends AccessibilityService {
 
 //            TasksWindow.show(this,event.getPackageName() + "\n" + event.getClassName());
             TasksWindow.changeMsg(event.getPackageName() + "\n" + event.getClassName());
-
         }
 
         if (eventType != AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
@@ -89,32 +87,37 @@ public class AutoService extends AccessibilityService {
                 String tickerText = String.valueOf(notification.tickerText);
                 Log.v(TAG, "tickerText:" + tickerText + "");
 
-                // 自动回复开启
+
+                String content = notification.tickerText.toString();
+                String[] cc = content.split(":");
+                name = cc != null && cc.length > 0 ? cc[0].trim() : "";
+                scontent = cc != null && cc.length > 1 ? cc[1].trim() : "";
+
+                // 自动抓取群信息
                 if (Config.isOpenAutoReply) {
 
-                    String content = notification.tickerText.toString();
+                    if (!Config.isRunning) {
+                        Config.isRunning = true;
 
-                    String[] cc = content.split(":");
+                        notifyWechat(event);
+                    }
 
-                    name = cc[0].trim();
-                    scontent = cc[1].trim();
+                } else if (Config.isOpenAutoCrawler) {
+                    // 自动抓取群
 
                     Log.v(TAG, "name:" + name + "\tscontent:" + scontent);
 
                     if (scontent.startsWith("[图片]")) {
                         MSG_TYPE = 1;
                         Log.v(TAG, "receive 图片");
-                        Config.toProcessEvent = true;
 
                     } else if (scontent.startsWith("[链接]")) {
                         MSG_TYPE = 2;
                         Log.v(TAG, "receive 链接");
-                        Config.toProcessEvent = true;
 
                     } else if (scontent.startsWith("[视频]")) {
                         MSG_TYPE = 3;
                         Log.v(TAG, "receive 视频");
-                        Config.toProcessEvent = true;
 
                     } else if (scontent.startsWith("[微信红包]")) {
                         // 不处理
@@ -125,29 +128,35 @@ public class AutoService extends AccessibilityService {
                     } else if (scontent.startsWith(name + "向你推荐了")) {
                         MSG_TYPE = 5;
                         Log.v(TAG, "receive 公众号");
-                        Config.toProcessEvent = true;
 
                     } else {
                         MSG_TYPE = 0;
                     }
 
                     if (MSG_TYPE == 1 || MSG_TYPE == 2 || MSG_TYPE == 3 | MSG_TYPE == 5) {
+                        if (!Config.isRunning) {
+                            Config.isRunning = true;
+
+                            notifyWechat(event);
+                        }
+                    }
+                } else if (Config.isOpenAutoOpenLuckyMoney && scontent.startsWith("[微信红包]")) {
+                    // 自动抢红包
+
+                    if (!Config.isRunning) {
+                        Config.isRunning = true;
+
+                        // 调起来对应的应用
                         notifyWechat(event);
                     }
                 }
-
-                if (tickerText.contains(": [微信红包]")) {
-                    // 调起来对应的应用
-                    openNotification(event);
-                }
-
             }
         }
 
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
 
             //抢红包
-            if (Config.isOpenAutoOpenLuckyMoney) {
+            if (Config.isOpenAutoOpenLuckyMoney && Config.isRunning) {
                 processLuckMoneyEvent(event);
             }  //自动加人
             else if (Config.isOpenAutoNearBy) {
@@ -165,13 +174,17 @@ public class AutoService extends AccessibilityService {
             else if (Config.isOpenAutoReply) {
                 processAutoRepay(event);
             }
+            // 自动抓取群信息
+            else if (Config.isOpenAutoCrawler && Config.isRunning) {
+                processAutoCrawler(event);
+            }
         }
 
     }
 
     private void processLuckMoneyEvent(AccessibilityEvent event) {
 
-//        Log.v(TAG, "EventType: " + event.getEventType() + "\taction:" + event.getAction() + "\tpackage:" + event.getPackageName() + "\tClass:" + event.getClassName() + "\t");
+        Log.v(TAG, "EventType: " + event.getEventType() + "\taction:" + event.getAction() + "\tpackage:" + event.getPackageName() + "\tClass:" + event.getClassName() + "\t");
 
         // 1.当前在聊天界面，查找并点击领取红包
         if ("com.tencent.mm.ui.LauncherUI".equals(event.getClassName())) {
@@ -190,6 +203,7 @@ public class AutoService extends AccessibilityService {
             // 返回
             doSleep(1000);
             performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+
 
         } else {
             // 2.当前在红包待开页面，点击打开红包
@@ -524,40 +538,64 @@ public class AutoService extends AccessibilityService {
      */
 
 
-    // 聊天页面遍历“领取红包”，点击红包，没有找到则隐藏微信
+    // 聊天页面遍历“领取红包”，点击红包，没有找到则隐藏微信，隐患是含有文本：领取红包
     public void findAndOpenLuckyEnvelope() {
 
+        boolean foundLuck = false;
         AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
         if (nodeInfo != null) {
 
             // 领取红包
-            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/ai5");
+            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/ah3");
 
 //            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText("领取红包");
 
             if (list != null && list.size() > 0) {
+
+                Log.v(TAG, "list.size():" + list.size());
                 //选择聊天记录中最新的红包，倒数去查找
                 for (int i = list.size() - 1; i >= 0; i--) {
 
-                    if ("领取红包".equals(list.get(i).getText())) {
-                        AccessibilityNodeInfo parent = list.get(i).getParent();
+                    AccessibilityNodeInfo luckNode = list.get(i);
+                    if (luckNode.getChildCount() > 1) {
 
-                        Log.d(TAG, "-->领取红包:" + parent);
+                        List<AccessibilityNodeInfo> unOpenLuckList = luckNode.findAccessibilityNodeInfosByText("领取红包");
+                        if (unOpenLuckList != null && unOpenLuckList.size() > 0) {
+                            Log.d(TAG, "-->领取红包:");
+                            luckNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 
-                        if (parent != null) {
-                            parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                            foundLuck = true;
                             break;
+                        } else {
+                            Log.e(TAG, "unOpenLuckList is null");
                         }
+
+                    } else {
+                        Log.e(TAG, "luckNode.getChildCount():" + luckNode.getChildCount());
                     }
                 }
+
+                // 没有找到红包，则微信隐藏到后台
+                if (!foundLuck) {
+
+                    // 返回，微信后台运行
+                    doSleep(1000);
+                    performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+
+                    // 返回，微信后台运行
+                    doSleep(1000);
+                    performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+
+                    Config.isRunning = false;
+
+                }
+            } else {
+                Log.e(TAG, "list com.tencent.mm:id/ah3 is null");
             }
         } else {
             Log.e(TAG, "nodeInfo is null");
         }
 
-        // 返回，微信后台运行
-//        doSleep(1000);
-//        performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
     }
 
 
@@ -1049,24 +1087,6 @@ public class AutoService extends AccessibilityService {
 
     }
 
-    /**
-     * 把通知对应的应用调起来
-     */
-    private void openNotification(AccessibilityEvent event) {
-        if (event.getParcelableData() == null || !(event.getParcelableData() instanceof Notification)) {
-            return;
-        }
-
-        // 调起来应用
-        Notification notification = (Notification) event.getParcelableData();
-        PendingIntent pendingIntent = notification.contentIntent;
-
-        try {
-            pendingIntent.send();
-        } catch (PendingIntent.CanceledException e) {
-            e.printStackTrace();
-        }
-    }
 
 /*****
  *
@@ -1234,20 +1254,38 @@ public class AutoService extends AccessibilityService {
             boolean isFillEditText = false;
             AccessibilityNodeInfo rootNode = getRootInActiveWindow();
 
-            if (Config.toProcessEvent) {
-                getSnsMsg(rootNode);
+            if (rootNode != null) {
+                isFillEditText = findEditText(rootNode, "Auto Reply");
             }
-
-//            if (rootNode != null) {
-//                isFillEditText = findEditText(rootNode, "Auto Reply");
-//            }
-//            if (isFillEditText) {
-//                clickSendBtn();
-//            }
+            if (isFillEditText) {
+                clickSendBtn();
+            }
 
         }
 
     }
+
+
+/**
+ * 自动抓取群信息---start
+ */
+
+    /**
+     * @param event
+     */
+    public void processAutoCrawler(final AccessibilityEvent event) {
+
+        if ("com.tencent.mm.ui.LauncherUI".equals(event.getClassName())) {
+
+            AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+
+            if (Config.isRunning) {
+                getSnsMsg(rootNode);
+            }
+        }
+
+    }
+
 
     /**
      * 寻找窗体中的“发送”按钮，并且点击。
@@ -1404,7 +1442,6 @@ public class AutoService extends AccessibilityService {
 
                         doSleep(1000);
 
-
                         AccessibilityNodeInfo imgFileNodeInfo = getRootInActiveWindow();
                         List<AccessibilityNodeInfo> imgFileNodeList = imgFileNodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bxb");
                         if (imgFileNodeList != null && imgFileNodeList.size() > 0) {
@@ -1413,7 +1450,8 @@ public class AutoService extends AccessibilityService {
                             imgFileNodeList.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
                             doSleep(2000);
 
-                            Config.toProcessEvent = false;
+                            // 处理结束，开始处理新内容
+                            Config.isRunning = false;
                         }
                     } else {
                         Log.e(TAG, "imgNode not isClickable");
@@ -1485,8 +1523,8 @@ public class AutoService extends AccessibilityService {
                             Log.e(TAG, "webNodeList is null");
                         }
 
-                        Config.toProcessEvent = false;
-
+                        // 处理结束，开始处理新内容
+                        Config.isRunning = false;
 
                     } else {
                         Log.e(TAG, "articleNodeList.get(0) not isClickable");
@@ -1531,7 +1569,8 @@ public class AutoService extends AccessibilityService {
 
                         }
 
-                        Config.toProcessEvent = false;
+                        // 处理结束，开始处理新内容
+                        Config.isRunning = false;
                     } else {
                         Log.e(TAG, "videoNode not isClickable");
                     }
@@ -1553,7 +1592,8 @@ public class AutoService extends AccessibilityService {
                         String publicName = List.get(0).getText().toString();
                         Log.v(TAG, "publicName:" + publicName);
 
-                        Config.toProcessEvent = false;
+                        // 处理结束，开始处理新内容
+                        Config.isRunning = false;
                     } else {
                         Log.e(TAG, "List is null");
                     }

@@ -19,11 +19,6 @@ public class Config {
     public final static String WX_PACKAGE_NAME = "com.tencent.mm";
 
     /**
-     * 是否打开自动回复
-     */
-    public static boolean isOpenAutoReply = false;
-
-    /**
      * 是否打开自动抢红包
      */
     public static boolean isOpenAutoOpenLuckyMoney = false;
@@ -47,6 +42,21 @@ public class Config {
      * 自动发布朋友圈
      */
     public static boolean isIsOpenAutoSns = false;
+
+    /**
+     * 是否打开自动回复
+     */
+    public static boolean isOpenAutoReply = false;
+
+    /**
+     * 是否打开自动抓取群信息
+     */
+    public static boolean isOpenAutoCrawler = false;
+
+    /**
+     * 正在运行中
+     */
+    public static boolean isRunning = false;
 
     /**
      * 群名称
@@ -88,11 +98,6 @@ public class Config {
      */
     public static boolean HAS_POST_SNS = false;
 
-    /**
-     * 正在处理事件
-     *
-     */
-    public static boolean toProcessEvent = false;
     /**
      * 用于存储微信开红包按钮使用过的id，微信几乎每次版本更新都会修改此button的id
      */
