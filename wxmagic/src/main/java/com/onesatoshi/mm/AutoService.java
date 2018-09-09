@@ -7,6 +7,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -17,6 +18,13 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.onesatoshi.mm.entity.JsonNewsEntity;
+import com.onesatoshi.mm.util.OkHttpClientManager;
+import com.squareup.okhttp.Request;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +60,7 @@ public class AutoService extends AccessibilityService {
     private Handler handler = new Handler();
 
     private String name;
-    private String scontent;
+    private String content;
     private int MSG_TYPE = 0;
 
     private List<AccessibilityNodeInfo> listNodeResult = new ArrayList<>();
@@ -91,7 +99,7 @@ public class AutoService extends AccessibilityService {
                 String content = notification.tickerText.toString();
                 String[] cc = content.split(":");
                 name = cc != null && cc.length > 0 ? cc[0].trim() : "";
-                scontent = cc != null && cc.length > 1 ? cc[1].trim() : "";
+                this.content = cc != null && cc.length > 1 ? cc[1].trim() : "";
 
                 // 自动抓取群信息
                 if (Config.isOpenAutoReply) {
@@ -105,27 +113,27 @@ public class AutoService extends AccessibilityService {
                 } else if (Config.isOpenAutoCrawler) {
                     // 自动抓取群
 
-                    Log.v(TAG, "name:" + name + "\tscontent:" + scontent);
+                    Log.v(TAG, "name:" + name + "\tcontent:" + this.content);
 
-                    if (scontent.startsWith("[图片]")) {
+                    if (this.content.startsWith("[图片]")) {
                         MSG_TYPE = 1;
                         Log.v(TAG, "receive 图片");
 
-                    } else if (scontent.startsWith("[链接]")) {
+                    } else if (this.content.startsWith("[链接]")) {
                         MSG_TYPE = 2;
                         Log.v(TAG, "receive 链接");
 
-                    } else if (scontent.startsWith("[视频]")) {
+                    } else if (this.content.startsWith("[视频]")) {
                         MSG_TYPE = 3;
                         Log.v(TAG, "receive 视频");
 
-                    } else if (scontent.startsWith("[微信红包]")) {
+                    } else if (this.content.startsWith("[微信红包]")) {
                         // 不处理
 
                         MSG_TYPE = 4;
                         Log.v(TAG, "receive 微信红包");
 
-                    } else if (scontent.startsWith(name + "向你推荐了")) {
+                    } else if (this.content.startsWith(name + "向你推荐了")) {
                         MSG_TYPE = 5;
                         Log.v(TAG, "receive 公众号");
 
@@ -140,7 +148,7 @@ public class AutoService extends AccessibilityService {
                             notifyWechat(event);
                         }
                     }
-                } else if (Config.isOpenAutoOpenLuckyMoney && scontent.startsWith("[微信红包]")) {
+                } else if (Config.isOpenAutoOpenLuckyMoney && this.content.startsWith("[微信红包]")) {
                     // 自动抢红包
 
                     if (!Config.isRunning) {
@@ -168,10 +176,10 @@ public class AutoService extends AccessibilityService {
             else if (Config.isOpenAddFriendFromGroup) {
                 processAddFriendFromGroup(event);
             } // 发朋友圈
-            else if (Config.isIsOpenAutoSns && !Config.HAS_POST_SNS) {
+            else if (Config.isIsOpenAutoSns) {
                 processPostSns(event);
             } // 自动回复
-            else if (Config.isOpenAutoReply) {
+            else if (Config.isOpenAutoReply && Config.isRunning) {
                 processAutoRepay(event);
             }
             // 自动抓取群信息
@@ -514,20 +522,62 @@ public class AutoService extends AccessibilityService {
 
         //第一次启动app
         if ("com.tencent.mm.ui.LauncherUI".equals(event.getClassName())) {
-            //进入朋友圈页面
-            openCircleOfFriends();
+            Log.v(TAG, "System.currentTimeMillis() - Config.lastUpdate:" + (System.currentTimeMillis() - Config.lastUpdate) + ",Config.lastUpdate:" + Config.lastUpdate);
+            if (!Config.isRunning && ((System.currentTimeMillis() - Config.lastUpdate) > 1000 * 60 * 1)) {
+                Config.isRunning = true;
+
+                //进入朋友圈页面
+                openCircleOfFriends();
+            }
 
         } else if ("com.tencent.mm.plugin.sns.ui.SnsTimeLineUI".equals(event.getClassName())) {
+
             //点击发朋友圈按钮，并且选择照片
             clickCircleOfFriendsBtn();
+
         } else if ("com.tencent.mm.plugin.sns.ui.SnsUploadUI".equals(event.getClassName())) {
-            //写入要发送的朋友圈内容
-            inputContentFinish(Config.SNS_CONTENT);
+
+            OkHttpClientManager.getAsyn(Config.NEWS_URL,
+                    new OkHttpClientManager.ResultCallback<String>() {
+                        @Override
+                        public void onError(Request request, Exception e) {
+                            Log.e(TAG, "internet error," + e.getMessage());
+                        }
+
+                        @Override
+                        public void onResponse(String resultJson) {
+
+//                            Log.v(TAG, resultJson);
+
+                            List<JsonNewsEntity> newsList = new Gson().fromJson(resultJson, new TypeToken<List<JsonNewsEntity>>() {
+                            }.getType());
+
+                            if (newsList != null && newsList.size() > 0) {
+                                int MAX = 1;
+                                StringBuilder sb = new StringBuilder();
+                                for (int i = 0; i < newsList.size() && i < MAX; i++) {
+                                    JsonNewsEntity news = newsList.get(i);
+
+                                    sb.append("【");
+                                    sb.append(news.getTitle());
+                                    sb.append("】");
+                                    sb.append(news.getContent());
+                                }
+
+                                //写入要发送的朋友圈内容
+                                inputContentFinish(sb.toString());//UI线程
+                            }
+                        }
+                    });
+
+
         } else if ("com.tencent.mm.plugin.gallery.ui.AlbumPreviewUI".equals(event.getClassName())) {
+
             // 选择图片
             choosePicture(Config.ALBUM_INDEX, Config.ALBUM_COUNT);
 
         } else if ("com.tencent.mm".equals(event.getClassName().subSequence(1, 14))) {
+
             openCircleOfFriends();
         }
 
@@ -1105,34 +1155,65 @@ public class AutoService extends AccessibilityService {
             public void run() {
 
                 AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
+
                 // 文本框，android.widget.EditText
-                List<AccessibilityNodeInfo> editNodeInfo = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/dp0");
+                List<String> editNodeStrList = new ArrayList<>();
+                // 华为
+                editNodeStrList.add("com.tencent.mm:id/dp0");
+                // 红米
+                editNodeStrList.add("com.tencent.mm:id/ddw");
+                for (String editNodeStr : editNodeStrList) {
 
-                if (editNodeInfo.size() > 0) {
-                    // 粘贴内容
-                    ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("text", contentStr);
-                    if (clipboard == null) {
-                        return;
+                    List<AccessibilityNodeInfo> editNodeInfoList = nodeInfo.findAccessibilityNodeInfosByViewId(editNodeStr);
+
+                    if (editNodeInfoList != null && editNodeInfoList.size() > 0) {
+
+                        AccessibilityNodeInfo editNode = editNodeInfoList.get(0);
+                        if (editNode != null) {
+                            // 粘贴内容
+                            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            ClipData clip = ClipData.newPlainText("text", contentStr);
+                            if (clipboard == null) {
+                                Log.e(TAG, "clipboard is null");
+                                return;
+                            }
+
+                            clipboard.setPrimaryClip(clip);
+                            editNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                            editNode.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                            Log.v(TAG, "写入内容:" + contentStr);
+                        }
                     }
-                    clipboard.setPrimaryClip(clip);
-                    editNodeInfo.get(0).performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                    editNodeInfo.get(0).performAction(AccessibilityNodeInfo.ACTION_PASTE);
-                    Log.v(TAG, "写入内容");
                 }
+
                 //点击发送 android.widget.TextView
-                List<AccessibilityNodeInfo> sendMsgButton = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/iv");
-                if (sendMsgButton == null || sendMsgButton.size() == 0) {
-                    Log.v(TAG, "发送朋友圈失败");
-                    return;
+                List<String> sendNodeStrList = new ArrayList<>();
+                // 华为
+                sendNodeStrList.add("com.tencent.mm:id/iv");
+                // 红米
+                sendNodeStrList.add("com.tencent.mm:id/hh");
+                for (String sendNodeStr : sendNodeStrList) {
+
+                    List<AccessibilityNodeInfo> sendMsgNodeList = nodeInfo.findAccessibilityNodeInfosByViewId(sendNodeStr);
+                    if (sendMsgNodeList != null && sendMsgNodeList.size() > 0) {
+
+                        AccessibilityNodeInfo sendNode = sendMsgNodeList.get(0);
+
+                        if (sendNode != null && sendNode.isClickable()) {
+                            sendNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+
+                            Log.v(TAG, "发送朋友圈成功");
+                            Toast.makeText(getApplicationContext(), "发送朋友圈成功", Toast.LENGTH_LONG).show();
+
+                            doSleep(1000);
+                            performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK);
+
+                            Config.lastUpdate = System.currentTimeMillis();
+                            Config.isRunning = false;
+                        }
+
+                    }
                 }
-
-                sendMsgButton.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
-
-                Config.HAS_POST_SNS = true;
-                Log.v(TAG, "发送朋友圈成功");
-                Toast.makeText(getApplicationContext(), "发送朋友圈成功", Toast.LENGTH_LONG).show();
-
             }
         }, 1500);
     }
@@ -1150,52 +1231,61 @@ public class AutoService extends AccessibilityService {
         if (nodeInfo != null) {
 
             // 相册，android.widget.GridView
-            List<AccessibilityNodeInfo> gridNodeInfoList = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/d_t");
+//            gridNodeStrList.add("com.tencent.mm:id/d_t");
+            // 红米
+//            gridNodeStrList.add("com.tencent.mm:id/fj");
 
-            if (gridNodeInfoList != null && gridNodeInfoList.size() > 0) {
 
-                Log.v(TAG, "gridNodeInfo:" + gridNodeInfoList.size());
+            // 选中按钮，android.widget.CheckBox
+            List<String> picNodeStrList = new ArrayList<>();
+            // 华为
+            picNodeStrList.add("com.tencent.mm:id/ba2");
+            // 红米
+            picNodeStrList.add("com.tencent.mm:id/bnw");
 
-                AccessibilityNodeInfo gradeInfo = gridNodeInfoList.get(0);
+            for (String picNodeStr : picNodeStrList) {
+                List<AccessibilityNodeInfo> picNodeInfoList = nodeInfo.findAccessibilityNodeInfosByViewId(picNodeStr);
 
-                for (int j = startPicIndex; j < startPicIndex + picCount; j++) {
+                if (picNodeInfoList != null && picNodeInfoList.size() > 0) {
 
-                    AccessibilityNodeInfo childNodeInfo = gradeInfo.getChild(j);
+                    Log.v(TAG, "childNodeInfoList:" + picNodeInfoList.size());
 
-                    if (childNodeInfo != null) {
-                        // 选中按钮，android.widget.CheckBox
-                        List<AccessibilityNodeInfo> childNodeInfoList = childNodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/ba2");
-                        if (childNodeInfoList != null && childNodeInfoList.size() > 0) {
+                    for (int j = startPicIndex; j < startPicIndex + picCount; j++) {
 
-                            Log.v(TAG, "childNodeInfoList:" + childNodeInfoList.size() + "," + childNodeInfoList.get(0).toString() + "," + childNodeInfoList.get(0).getClassName());
-
-                            childNodeInfoList.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
-//                            childNodeInfoList.get(0).getParent().performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION);
-
+                        AccessibilityNodeInfo picNode = picNodeInfoList.get(j);
+                        if (picNode.isClickable()) {
+                            picNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                            Log.v(TAG, "click pic");
                             doSleep(1000);
-                        } else {
-                            Log.v(TAG, "childNodeInfoList is null");
-
                         }
-                    } else {
-                        Log.v(TAG, "childNodeInfo is null");
-
                     }
                 }
-            } else {
-                Log.v(TAG, "gridNodeInfo is null");
             }
 
-            doSleep(1000);
+            doSleep(2000);
 
             // 点击确定，android.widget.TextView
-            List<AccessibilityNodeInfo> finishList = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/iv");
-            if (finishList != null && finishList.size() != 0) {
+            List<String> finishStrList = new ArrayList<>();
+            // 华为
+            finishStrList.add("com.tencent.mm:id/iv");
+            // 红米
+            finishStrList.add("com.tencent.mm:id/hh");
+            for (String finishStr : finishStrList) {
+                List<AccessibilityNodeInfo> finishList = nodeInfo.findAccessibilityNodeInfosByViewId(finishStr);
+                if (finishList != null && finishList.size() > 0) {
 
-                finishList.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                Log.v(TAG, "完成图片选择!");
+                    AccessibilityNodeInfo finishNode = finishList.get(0);
+                    if (finishNode.isClickable()) {
+                        finishNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        Log.v(TAG, "完成图片选择!");
+                        doSleep(1000);
+                    }
+                }
             }
-        } else {
+
+        } else
+
+        {
             Log.v(TAG, "nodeInfo is null");
         }
 
@@ -1207,41 +1297,63 @@ public class AutoService extends AccessibilityService {
     private void clickCircleOfFriendsBtn() {
         AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
 
-        if (nodeInfo == null) {
-            return;
-        }
+        if (nodeInfo != null) {
+            doSleep(1000);
 
-        doSleep(1000);
+            // 发朋友圈按钮，android.widget.ImageButton
+            List<String> btns = new ArrayList<>();
+            btns.add("com.tencent.mm:id/iw");
+            btns.add("com.tencent.mm:id/gd");
+            for (String btn : btns) {
+                List<AccessibilityNodeInfo> makeBtn = nodeInfo.findAccessibilityNodeInfosByViewId(btn);
+                if (makeBtn != null && makeBtn.size() != 0 && makeBtn.get(0) != null) {
+                    AccessibilityNodeInfo btnNode = makeBtn.get(0);
+                    if (btnNode.isClickable()) {
+                        btnNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    } else if (btnNode.getParent() != null && btnNode.getParent().isClickable()) {
+                        btnNode.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    }
+                }
 
-        // 发朋友圈按钮，android.widget.ImageButton
-        List<AccessibilityNodeInfo> makeBtn = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/iw");
-        if (makeBtn != null && makeBtn.size() != 0 && makeBtn.get(0) != null) {
-            makeBtn.get(0).performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        }
+                doSleep(1000);
 
-        doSleep(1000);
+            }
 
-        // 重新抓取视图
-        nodeInfo = getRootInActiveWindow();
+            // 重新抓取视图
+            nodeInfo = getRootInActiveWindow();
 
-        // 相册 android.widget.TextView
-        List<AccessibilityNodeInfo> albumBtn = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/ci");
-        if (albumBtn != null && albumBtn.size() > 1) {
+            // 相册 android.widget.TextView
+            List<String> albumBtn = new ArrayList<>();
+            albumBtn.add("com.tencent.mm:id/ci");
+            albumBtn.add("com.tencent.mm:id/ge");
 
-            Log.v(TAG, "albumBtn:" + albumBtn.size());
+            for (String btn : albumBtn) {
+                List<AccessibilityNodeInfo> albumBtnNodeList = nodeInfo.findAccessibilityNodeInfosByViewId(btn);
+                if (albumBtnNodeList != null && albumBtnNodeList.size() > 1) {
 
-            // 第二个从相册获取
-            albumBtn.get(1).getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            Log.v(TAG, "打开相册!");
+                    Log.v(TAG, "albumBtnNodeList:" + albumBtnNodeList.size());
 
-        } else {
-            Log.v(TAG, "albumBtn is null");
+                    // 第二个从相册获取
+                    AccessibilityNodeInfo btnParent = albumBtnNodeList.get(1).getParent();
+                    if (btnParent != null && btnParent.isClickable()) {
+                        btnParent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    } else if (btnParent.getParent() != null && btnParent.getParent().isClickable()) {
+                        btnParent.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    }
 
+                    Log.v(TAG, "打开相册!");
+
+                }
+            }
         }
     }
 
+
 /**
  * 自动回复---start
+ *
+ * @param event
+ * @param event
  */
 
     /**
@@ -1295,11 +1407,12 @@ public class AutoService extends AccessibilityService {
         AccessibilityNodeInfo nodeInfo = getRootInActiveWindow();
 
         if (nodeInfo != null) {
-            List<AccessibilityNodeInfo> list = nodeInfo
-                    .findAccessibilityNodeInfosByText("发送");
+            // 中文版
+            List<AccessibilityNodeInfo> list = nodeInfo.findAccessibilityNodeInfosByText("发送");
             if (list != null && list.size() > 0) {
                 for (AccessibilityNodeInfo n : list) {
                     if (n.getClassName().equals("android.widget.Button") && n.isEnabled()) {
+
                         Log.v(TAG, "click sendMsg button");
                         if (!Config.DEBUG) {
                             n.performAction(AccessibilityNodeInfo.ACTION_CLICK);
@@ -1308,8 +1421,8 @@ public class AutoService extends AccessibilityService {
                 }
 
             } else {
-                List<AccessibilityNodeInfo> liste = nodeInfo
-                        .findAccessibilityNodeInfosByText("Send");
+                // 英文版
+                List<AccessibilityNodeInfo> liste = nodeInfo.findAccessibilityNodeInfosByText("Send");
 
                 if (liste != null && liste.size() > 0) {
 
@@ -1323,6 +1436,9 @@ public class AutoService extends AccessibilityService {
                     }
                 }
             }
+
+            // 处理完成，开始处理新信息
+            Config.isRunning = false;
 
             Log.v(TAG, "click backButton");
             doSleep(1000);
@@ -1368,7 +1484,7 @@ public class AutoService extends AccessibilityService {
             }
 //            if (nodeInfo.getContentDescription() != null) {
 //                int nindex = nodeInfo.getContentDescription().toString().indexOf(name);
-//                int cindex = nodeInfo.getContentDescription().toString().indexOf(scontent);
+//                int cindex = nodeInfo.getContentDescription().toString().indexOf(content);
 //                if (nindex != -1) {
 //                    itemNodeinfo = nodeInfo;
 //                }
@@ -1462,7 +1578,7 @@ public class AutoService extends AccessibilityService {
                 break;
 
             } else if (MSG_TYPE == 2) {
-                // 文章分享，可以点击\
+// 文章分享，可以点击\
 
                 final List<AccessibilityNodeInfo> articleNodeList = msgNode.getParent().findAccessibilityNodeInfosByViewId("com.tencent.mm:id/ah3");
 
@@ -1630,23 +1746,33 @@ public class AutoService extends AccessibilityService {
         if (nodeInfo != null) {
 
             // 底部导航按钮，android.widget.LinearLayout
-            List<AccessibilityNodeInfo> tabNodes = nodeInfo.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/chp");
+            List<String> findNodeStrList = new ArrayList<>();
+            // 华为
+            findNodeStrList.add("com.tencent.mm:id/chp");
+            // 红米
+            findNodeStrList.add("com.tencent.mm:id/c9f");
+            for (String findNodeStr : findNodeStrList) {
+                List<AccessibilityNodeInfo> findNodeList = nodeInfo.findAccessibilityNodeInfosByViewId(findNodeStr);
 
-            if (tabNodes != null && tabNodes.size() > 0) {
-                for (AccessibilityNodeInfo tabNode : tabNodes) {
+                if (findNodeList != null && findNodeList.size() > 0) {
 
-                    Log.v(TAG, "tabNode.getText().toString():" + tabNode.getText().toString());
+                    for (AccessibilityNodeInfo findNode : findNodeList) {
 
-                    if ("发现".equals(tabNode.getText().toString())) {
+                        if (findNode.getText() != null && "发现".equals(findNode.getText().toString())) {
 
-                        tabNode.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        Log.v(TAG, "click 发现");
-
-                        break;
+                            AccessibilityNodeInfo parent = findNode.getParent();
+                            while (parent != null) {
+                                if (parent.isClickable()) {
+                                    findNode.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                    Log.v(TAG, "click 发现");
+                                    break;
+                                } else {
+                                    parent = parent.getParent();
+                                }
+                            }
+                        }
                     }
                 }
-            } else {
-                Log.v(TAG, "tabNodes is null");
             }
         }
 
@@ -1655,7 +1781,9 @@ public class AutoService extends AccessibilityService {
         // 列表android.widget.ListView
         List<AccessibilityNodeInfo> nodeInfoList = nodeInfo.findAccessibilityNodeInfosByViewId("android:id/list");
 
-        if (nodeInfoList != null && nodeInfoList.size() != 0) {
+        if (nodeInfoList != null && nodeInfoList.size() != 0)
+
+        {
 
             // 获取列表
             AccessibilityNodeInfo subNodeInfo = nodeInfoList.get(0);
@@ -1672,6 +1800,7 @@ public class AutoService extends AccessibilityService {
                 }
             }
         }
+
     }
 
 

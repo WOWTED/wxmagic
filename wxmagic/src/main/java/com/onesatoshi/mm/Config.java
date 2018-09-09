@@ -94,11 +94,6 @@ public class Config {
     public static final int ALBUM_COUNT = 1;
 
     /**
-     * 是否已经选好了图片
-     */
-    public static boolean HAS_POST_SNS = false;
-
-    /**
      * 用于存储微信开红包按钮使用过的id，微信几乎每次版本更新都会修改此button的id
      */
     public static final List<String> openIds = Arrays.asList("bjj", "bi3", "brt");
@@ -109,4 +104,13 @@ public class Config {
     public static final List<String> luckyActivityNames = Arrays.asList("com.tencent.mm.plugin.luckymoney.ui.En_fba4b94f",
             "com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI");
 
+    /**
+     * 抓取新闻的网址
+     */
+    public static final String NEWS_URL = "http://45.77.248.237:9999/api/top10news.do";
+
+    /**
+     * 上次执行时间
+     */
+    public static long lastUpdate = 0;
 }
